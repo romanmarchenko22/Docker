@@ -1,40 +1,29 @@
-FROM ubuntu:18.04
+FROM ubuntu:20.04
 
 ARG DEBIAN_FRONTEND=noninteractive
 
-ENV TZ=Europe/Kiev
-
 LABEL maintainer="Roman Marchenko <roman.marchenko@globallogic.com>"
 
-WORKDIR /root/
+RUN apt-get clean && apt-get update && apt-get upgrade -y
 
-ENV USER root
+# Install Google recommended packages ( https://source.android.com/setup/build/initializing#installing-required-packages-ubuntu-1804 )
+RUN apt-get install -y git-core gnupg flex bison build-essential zip curl zlib1g-dev gcc-multilib g++-multilib libc6-dev-i386 lib32ncurses5-dev x11proto-core-dev libx11-dev lib32z1-dev libgl1-mesa-dev libxml2-utils xsltproc unzip fontconfig
 
-ENV PATH="/android_build/bin:${PATH}"
+# Install additional packages
+RUN apt-get install -y swig libssl-dev flex bison device-tree-compiler mtools git gettext libncurses5 libgmp-dev libmpc-dev cpio rsync dosfstools kmod gdisk wget
 
-RUN rm -rf /var/cache/apt && rm -rf /var/lib/apt/lists
+# Install additional packages (for building mesa3d and other meson-based components)
+RUN apt-get install -y meson python3-pip pkg-config python3-dev
+RUN pip3 install mako
 
-RUN apt-get clean && apt-get update && apt-get upgrade -y 
+# Create new user
+RUN useradd -m user
+USER user
 
-#install essential build
-RUN apt-get install -y apt-transport-https bison build-essential cpio curl device-tree-compiler dosfstools flex fontconfig g++-multilib gcc-multilib gdisk gettext git git-core gnupg kmod lib32ncurses5-dev lib32z1-dev libc6-dev-i386 libgl1-mesa-dev libssl-dev libx11-dev libxml2-utils mtools python3-dev python3-pip python-dev python-pip rsync software-properties-common ssh swig unzip x11proto-core-dev xsltproc zip zlib1g-dev
-                                     
-#install Mako 
-RUN apt-get update && pip install Mako
+# Install repo
+RUN wget -P ~/bin http://commondatastorage.googleapis.com/git-repo-downloads/repo
+RUN chmod a+x ~/bin/repo
 
-#install repo
-RUN mkdir -p /android_build/bin && curl https://storage.googleapis.com/git-repo-downloads/repo > /android_build/bin/repo && chmod a+x /android_build/bin/repo
-
-#change dash to bash
-RUN echo "dash dash/sh boolean false" | debconf-set-selections
-
-RUN DEBIAN_FRONTEND=noninteractive dpkg-reconfigure dash
-
-#set volume
-RUN mkdir /aosp
-
-WORKDIR /aosp
-
-RUN chown -R $USER:$USER /aosp 
-
-RUN  mkdir -p /lib/modules/$(uname -r) && sudo depmod -a 2>/dev/null || true
+# Prepare workdir
+RUN mkdir ~/aosp
+WORKDIR /home/user/aosp
